@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
 import FriendsPage from './pages/FriendsPage';
 import ChatsPage from './pages/ChatsPage';
+import ChatRoomPage from './pages/ChatRoomPage';
 import ProfilePage from './pages/ProfilePage';
 import { useAuthStore } from './store/authStore';
 import { bootstrapProfile } from './api/index';
@@ -54,6 +55,9 @@ export default function App() {
       <BrowserRouter>
         <AppBootstrap>
           <Routes>
+            {/* Chat room: no tab bar */}
+            <Route path="/chats/:roomId" element={<ChatRoomPage />} />
+
             <Route element={<Layout />}>
               <Route path="/friends" element={<FriendsPage />} />
               <Route path="/chats" element={<ChatsPage />} />

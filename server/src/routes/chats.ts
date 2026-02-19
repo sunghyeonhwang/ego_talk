@@ -308,4 +308,338 @@ router.post("/api/chats", async (req: Request, res: Response) => {
   }
 });
 
+// ───── 멤버십 검증 헬퍼 ─────
+async function checkMembership(
+  roomId: string,
+  profileId: string
+): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT 1 FROM ego_chat_room_members WHERE room_id = $1 AND user_id = $2`,
+    [roomId, profileId]
+  );
+  return result.rowCount !== null && result.rowCount > 0;
+}
+
+// GET /api/chats/:roomId/messages?profile_id=...&cursor=...&limit=30
+router.get(
+  "/api/chats/:roomId/messages",
+  async (req: Request, res: Response) => {
+    try {
+      const roomId = req.params.roomId as string;
+      const profile_id = req.query.profile_id as string | undefined;
+      const cursor = req.query.cursor as string | undefined;
+      let limit = parseInt(req.query.limit as string, 10);
+
+      // profile_id 검증
+      if (!profile_id) {
+        res.status(400).json({
+          success: false,
+          message: "profile_id is required",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      if (!isValidUUID(profile_id)) {
+        res.status(400).json({
+          success: false,
+          message: "profile_id must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // roomId 검증
+      if (!isValidUUID(roomId)) {
+        res.status(400).json({
+          success: false,
+          message: "roomId must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // cursor 검증 (선택적)
+      if (cursor !== undefined && !isValidUUID(cursor)) {
+        res.status(400).json({
+          success: false,
+          message: "cursor must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // limit 범위
+      if (isNaN(limit) || limit < 1) limit = 30;
+      if (limit > 50) limit = 50;
+
+      // 멤버십 검증
+      const isMember = await checkMembership(roomId, profile_id);
+      if (!isMember) {
+        res.status(403).json({
+          success: false,
+          message: "You are not a member of this chat room",
+          code: "NOT_A_MEMBER",
+        });
+        return;
+      }
+
+      // 메시지 조회
+      let query: string;
+      let params: (string | number)[];
+
+      if (cursor) {
+        query = `SELECT m.id, m.room_id, m.sender_id, m.content, m.message_type, m.created_at,
+                        p.display_name AS sender_name
+                 FROM ego_messages m
+                 JOIN ego_profiles p ON p.id = m.sender_id
+                 WHERE m.room_id = $1
+                   AND m.created_at < (SELECT created_at FROM ego_messages WHERE id = $2)
+                 ORDER BY m.created_at DESC
+                 LIMIT $3`;
+        params = [roomId, cursor, limit + 1];
+      } else {
+        query = `SELECT m.id, m.room_id, m.sender_id, m.content, m.message_type, m.created_at,
+                        p.display_name AS sender_name
+                 FROM ego_messages m
+                 JOIN ego_profiles p ON p.id = m.sender_id
+                 WHERE m.room_id = $1
+                 ORDER BY m.created_at DESC
+                 LIMIT $2`;
+        params = [roomId, limit + 1];
+      }
+
+      const result = await pool.query(query, params);
+      const has_more = result.rows.length > limit;
+      const messages = result.rows.slice(0, limit);
+
+      res.json({ success: true, data: { messages, has_more } });
+    } catch (err) {
+      console.error("GET /api/chats/:roomId/messages error:", err);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        code: "INTERNAL_ERROR",
+      });
+    }
+  }
+);
+
+// POST /api/chats/:roomId/messages
+router.post(
+  "/api/chats/:roomId/messages",
+  async (req: Request, res: Response) => {
+    try {
+      const roomId = req.params.roomId as string;
+      const body = req.body as Record<string, unknown>;
+
+      // roomId 검증
+      if (!isValidUUID(roomId)) {
+        res.status(400).json({
+          success: false,
+          message: "roomId must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // 필수 필드 검증
+      const requiredError = validateRequired(body, ["sender_id", "content"]);
+      if (requiredError) {
+        res.status(400).json({
+          success: false,
+          message: requiredError,
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      const sender_id = String(body.sender_id);
+      const content = String(body.content).trim();
+
+      // sender_id UUID 검증
+      if (!isValidUUID(sender_id)) {
+        res.status(400).json({
+          success: false,
+          message: "sender_id must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // content 길이 검증
+      if (content.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: "content must not be empty",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      if (content.length > 1000) {
+        res.status(400).json({
+          success: false,
+          message: "content must be 1000 characters or less",
+          code: "MESSAGE_TOO_LONG",
+        });
+        return;
+      }
+
+      // 멤버십 검증
+      const isMember = await checkMembership(roomId, sender_id);
+      if (!isMember) {
+        res.status(403).json({
+          success: false,
+          message: "You are not a member of this chat room",
+          code: "NOT_A_MEMBER",
+        });
+        return;
+      }
+
+      // INSERT 메시지
+      const result = await pool.query(
+        `INSERT INTO ego_messages (room_id, sender_id, content)
+         VALUES ($1, $2, $3)
+         RETURNING id, room_id, sender_id, content, message_type, created_at`,
+        [roomId, sender_id, content]
+      );
+
+      const msg = result.rows[0];
+
+      // sender_name 조회
+      const profileResult = await pool.query(
+        `SELECT display_name FROM ego_profiles WHERE id = $1`,
+        [sender_id]
+      );
+      const sender_name = profileResult.rows[0]?.display_name ?? null;
+
+      res.status(201).json({
+        success: true,
+        data: {
+          id: msg.id,
+          room_id: msg.room_id,
+          sender_id: msg.sender_id,
+          sender_name,
+          content: msg.content,
+          message_type: msg.message_type,
+          created_at: msg.created_at,
+        },
+      });
+    } catch (err) {
+      console.error("POST /api/chats/:roomId/messages error:", err);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        code: "INTERNAL_ERROR",
+      });
+    }
+  }
+);
+
+// POST /api/chats/:roomId/read
+router.post(
+  "/api/chats/:roomId/read",
+  async (req: Request, res: Response) => {
+    try {
+      const roomId = req.params.roomId as string;
+      const body = req.body as Record<string, unknown>;
+
+      // roomId 검증
+      if (!isValidUUID(roomId)) {
+        res.status(400).json({
+          success: false,
+          message: "roomId must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // 필수 필드 검증
+      const requiredError = validateRequired(body, [
+        "profile_id",
+        "last_read_message_id",
+      ]);
+      if (requiredError) {
+        res.status(400).json({
+          success: false,
+          message: requiredError,
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      const profile_id = String(body.profile_id);
+      const last_read_message_id = String(body.last_read_message_id);
+
+      // UUID 검증
+      if (!isValidUUID(profile_id)) {
+        res.status(400).json({
+          success: false,
+          message: "profile_id must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      if (!isValidUUID(last_read_message_id)) {
+        res.status(400).json({
+          success: false,
+          message: "last_read_message_id must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // 멤버십 검증
+      const isMember = await checkMembership(roomId, profile_id);
+      if (!isMember) {
+        res.status(403).json({
+          success: false,
+          message: "You are not a member of this chat room",
+          code: "NOT_A_MEMBER",
+        });
+        return;
+      }
+
+      // last_read_message_id, last_read_message_at 업데이트
+      const result = await pool.query(
+        `UPDATE ego_chat_room_members
+         SET last_read_message_id = $1,
+             last_read_message_at = (SELECT created_at FROM ego_messages WHERE id = $1)
+         WHERE room_id = $2 AND user_id = $3
+         RETURNING last_read_message_at`,
+        [last_read_message_id, roomId, profile_id]
+      );
+
+      if (result.rowCount === 0) {
+        res.status(404).json({
+          success: false,
+          message: "Room membership not found",
+          code: "NOT_A_MEMBER",
+        });
+        return;
+      }
+
+      const last_read_message_at = result.rows[0].last_read_message_at;
+
+      res.json({
+        success: true,
+        data: {
+          room_id: roomId,
+          profile_id,
+          last_read_message_at,
+        },
+      });
+    } catch (err) {
+      console.error("POST /api/chats/:roomId/read error:", err);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        code: "INTERNAL_ERROR",
+      });
+    }
+  }
+);
+
 export default router;

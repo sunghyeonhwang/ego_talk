@@ -11,6 +11,7 @@ import healthRouter from "./routes/health.js";
 import profilesRouter from "./routes/profiles.js";
 import friendsRouter from "./routes/friends.js";
 import chatsRouter from "./routes/chats.js";
+import { setupSocketHandlers } from "./socket.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -26,12 +27,7 @@ app.use(profilesRouter);
 app.use(friendsRouter);
 app.use(chatsRouter);
 
-io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
-  socket.on("disconnect", () => {
-    console.log("Socket disconnected:", socket.id);
-  });
-});
+setupSocketHandlers(io);
 
 const PORT = process.env.PORT || 4000;
 

@@ -80,3 +80,33 @@
 
 ### 검증 결과
 - 서버/클라이언트 TypeScript 타입 체크 통과
+
+## Phase 4: Realtime Messaging (2026-02-20)
+
+### 완료 항목
+
+1. **Backend 메시지 API**
+   - `GET /api/chats/:roomId/messages`: 커서 기반 페이지네이션 (has_more 포함)
+   - `POST /api/chats/:roomId/messages`: 메시지 전송 (1~1000자 검증, 멤버십 체크)
+   - `POST /api/chats/:roomId/read`: 읽음 처리 (last_read_message_at 갱신)
+   - 공통 `checkMembership()` 헬퍼 추출
+
+2. **Socket.IO 이벤트 (server/src/socket.ts)**
+   - `room:join`: 방 입장 + 멤버십 검증
+   - `message:send`: 메시지 DB INSERT → `message:new` broadcast + `chat:updated` emit
+   - `message:read`: 읽음 갱신 → `message:read:update` broadcast
+
+3. **Frontend 채팅방 (ChatRoomPage)**
+   - 메시지 리스트: 내 메시지(오른쪽, 노란색) / 상대(왼쪽, 회색)
+   - 날짜 구분선, 시간 표시 (HH:MM)
+   - Socket.IO 연동: 실시간 메시지 수신 + Optimistic UI
+   - 커서 기반 이전 메시지 로드 (스크롤 위치 복원)
+   - 자동 스크롤 (하단에 있을 때만)
+   - Enter 전송, Shift+Enter 줄바꿈
+   - 입장 시 자동 읽음 처리
+
+4. **useSocket 훅**
+   - 앱 전체 싱글턴 Socket 인스턴스 관리
+
+### 검증 결과
+- 서버/클라이언트 TypeScript 타입 체크 통과
