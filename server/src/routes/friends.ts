@@ -123,4 +123,132 @@ router.patch("/api/friends/:friendId/favorite", async (req: Request, res: Respon
   }
 });
 
+// POST /api/friends/add
+// friend_device_id로 상대방을 찾아 양방향 친구 추가
+router.post("/api/friends/add", async (req: Request, res: Response) => {
+  try {
+    const body = req.body as Record<string, unknown>;
+
+    // 필수 필드 검증
+    const requiredError = validateRequired(body, ["profile_id", "friend_device_id"]);
+    if (requiredError) {
+      res.status(400).json({ success: false, message: requiredError, code: "INVALID_INPUT" });
+      return;
+    }
+
+    const profile_id = String(body.profile_id);
+    const friend_device_id = String(body.friend_device_id).trim();
+
+    // profile_id UUID 검증
+    if (!isValidUUID(profile_id)) {
+      res.status(400).json({ success: false, message: "profile_id must be a valid UUID", code: "INVALID_INPUT" });
+      return;
+    }
+
+    // friend_device_id 공백 검증
+    if (!friend_device_id) {
+      res.status(400).json({ success: false, message: "friend_device_id must not be empty", code: "INVALID_INPUT" });
+      return;
+    }
+
+    // device_id로 상대방 프로필 조회
+    const friendProfileResult = await pool.query<{
+      id: string;
+      device_id: string;
+      display_name: string;
+      status_message: string | null;
+      avatar_url: string | null;
+    }>(
+      `SELECT id, device_id, display_name, status_message, avatar_url
+       FROM ego_profiles
+       WHERE device_id = $1`,
+      [friend_device_id]
+    );
+
+    if (friendProfileResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: "Friend profile not found", code: "NOT_FOUND" });
+      return;
+    }
+
+    const friendProfile = friendProfileResult.rows[0];
+
+    // 자기 자신 추가 방지
+    if (friendProfile.id === profile_id) {
+      res.status(400).json({ success: false, message: "Cannot add yourself as a friend", code: "INVALID_INPUT" });
+      return;
+    }
+
+    // 이미 친구인지 확인 (user_id → friend_id 방향)
+    const existingResult = await pool.query<{
+      id: string;
+    }>(
+      `SELECT id FROM ego_friendships
+       WHERE user_id = $1 AND friend_id = $2`,
+      [profile_id, friendProfile.id]
+    );
+
+    if (existingResult.rows.length > 0) {
+      // 이미 친구인 경우 기존 관계 반환
+      res.json({
+        success: true,
+        data: {
+          friendship_id: existingResult.rows[0].id,
+          friend: {
+            id: friendProfile.id,
+            display_name: friendProfile.display_name,
+            status_message: friendProfile.status_message,
+            avatar_url: friendProfile.avatar_url,
+          },
+        },
+      });
+      return;
+    }
+
+    // 트랜잭션으로 양방향 INSERT
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // user → friend
+      const insertResult = await client.query<{ id: string }>(
+        `INSERT INTO ego_friendships (user_id, friend_id)
+         VALUES ($1, $2)
+         RETURNING id`,
+        [profile_id, friendProfile.id]
+      );
+
+      // friend → user (역방향)
+      await client.query(
+        `INSERT INTO ego_friendships (user_id, friend_id)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [friendProfile.id, profile_id]
+      );
+
+      await client.query("COMMIT");
+
+      res.status(201).json({
+        success: true,
+        data: {
+          friendship_id: insertResult.rows[0].id,
+          friend: {
+            id: friendProfile.id,
+            display_name: friendProfile.display_name,
+            status_message: friendProfile.status_message,
+            avatar_url: friendProfile.avatar_url,
+          },
+        },
+      });
+    } catch (txErr) {
+      await client.query("ROLLBACK");
+      throw txErr;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error("POST /api/friends/add error:", err);
+    res.status(500).json({ success: false, message: "Internal server error", code: "INTERNAL_ERROR" });
+  }
+});
+
 export default router;

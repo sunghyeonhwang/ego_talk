@@ -110,3 +110,24 @@
 
 ### 검증 결과
 - 서버/클라이언트 TypeScript 타입 체크 통과
+
+## Phase 5: Profile & Extras (2026-02-20)
+
+### 완료 항목
+
+1. **Backend API**
+   - `PATCH /api/profiles/me`: 프로필 수정 (동적 SET, display_name/status_message/avatar_url)
+   - `PATCH /api/chats/:roomId/mute`: 채팅방 알림 mute 토글
+   - `POST /api/friends/add`: device_id 기반 친구 추가 (양방향 2 row, 트랜잭션)
+
+2. **Frontend 프로필 편집**
+   - ProfilePage: 인라인 편집 모드 (이름, 상태메시지, 아바타 URL)
+   - 저장 시 API 호출 + Zustand 스토어 동기화
+   - Device ID 표시 + 복사 버튼 (navigator.clipboard)
+
+3. **Frontend 친구 추가**
+   - FriendsPage: "+" 버튼 → Device ID 입력 패널
+   - addFriend API 호출 → 성공/에러 피드백 → 목록 갱신
+
+### 검증 결과
+- 서버/클라이언트 TypeScript 타입 체크 통과

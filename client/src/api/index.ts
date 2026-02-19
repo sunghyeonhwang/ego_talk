@@ -68,3 +68,33 @@ export async function markAsRead(roomId: string, profileId: string, lastReadMess
   });
   return res.json();
 }
+
+export async function updateProfile(
+  profileId: string,
+  data: { display_name?: string; status_message?: string; avatar_url?: string },
+) {
+  const res = await fetch(`${API_BASE}/profiles/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_id: profileId, ...data }),
+  });
+  return res.json();
+}
+
+export async function toggleMute(roomId: string, profileId: string, mute: boolean) {
+  const res = await fetch(`${API_BASE}/chats/${roomId}/mute`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_id: profileId, mute }),
+  });
+  return res.json();
+}
+
+export async function addFriend(profileId: string, friendDeviceId: string) {
+  const res = await fetch(`${API_BASE}/friends/add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_id: profileId, friend_device_id: friendDeviceId }),
+  });
+  return res.json();
+}

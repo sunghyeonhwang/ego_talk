@@ -1,17 +1,20 @@
 .profile-page {
   padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .profile-title {
   font-size: 18px;
   font-weight: 700;
-  margin-bottom: 20px;
   color: var(--color-text);
 }
 
+/* ── Profile Card ── */
 .profile-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   padding: 16px;
   border: 1px solid var(--color-border);
@@ -43,19 +46,184 @@
   color: var(--color-text);
 }
 
+/* ── View mode info ── */
 .profile-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .profile-name {
   font-size: 16px;
   font-weight: 700;
   color: var(--color-text);
-  margin-bottom: 4px;
 }
 
 .profile-status {
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+/* ── Edit form ── */
+.profile-edit-form {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-edit-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.profile-edit-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  font-size: 14px;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.profile-edit-input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.profile-edit-input:focus {
+  border-color: #999;
+}
+
+.profile-edit-error {
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.profile-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* ── Buttons ── */
+.profile-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  border: none;
+}
+
+.profile-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.profile-btn--save {
+  background: var(--color-primary);
+  color: var(--color-text);
+}
+
+.profile-btn--save:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.profile-btn--cancel {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.profile-btn--cancel:hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+}
+
+.profile-btn--edit {
+  align-self: flex-start;
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  padding: 6px 14px;
+}
+
+.profile-btn--edit:hover {
+  background: var(--color-bg-secondary);
+}
+
+/* ── Settings Card ── */
+.profile-settings-card {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.profile-device-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-device-id {
+  flex: 1;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--color-text);
+  word-break: break-all;
+  background: var(--color-bg);
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.profile-copy-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.profile-copy-btn:hover {
+  background: var(--color-primary);
+  color: var(--color-text);
+  border-color: var(--color-primary);
+}
+
+.profile-settings-hint {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
 }

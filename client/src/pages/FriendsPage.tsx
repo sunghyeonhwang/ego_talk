@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFriends, toggleFavorite } from '../api/index';
+import { getFriends, toggleFavorite, addFriend } from '../api/index';
 import { useAuthStore } from '../store/authStore';
 import './FriendsPage.css';
 
@@ -62,6 +62,11 @@ export default function FriendsPage() {
   const [query, setQuery] = useState('');
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [addDeviceId, setAddDeviceId] = useState('');
+  const [addError, setAddError] = useState('');
+  const [addSuccess, setAddSuccess] = useState('');
+
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     setSearchInput(value);
@@ -77,7 +82,7 @@ export default function FriendsPage() {
     enabled: !!profileId,
   });
 
-  const mutation = useMutation({
+  const favMutation = useMutation({
     mutationFn: ({
       friendshipId,
       isFavorite,
@@ -90,8 +95,46 @@ export default function FriendsPage() {
     },
   });
 
+  const addMutation = useMutation({
+    mutationFn: (friendDeviceId: string) => addFriend(profileId!, friendDeviceId),
+    onSuccess: (res) => {
+      if (res.success) {
+        setAddSuccess('친구가 추가되었습니다.');
+        setAddDeviceId('');
+        setAddError('');
+        queryClient.invalidateQueries({ queryKey: ['friends', profileId] });
+        setTimeout(() => {
+          setAddSuccess('');
+          setShowAddPanel(false);
+        }, 1500);
+      } else {
+        setAddError(res.message || '친구 추가에 실패했습니다.');
+      }
+    },
+    onError: () => {
+      setAddError('친구 추가 중 오류가 발생했습니다.');
+    },
+  });
+
   function handleToggleFavorite(friendshipId: string, isFavorite: boolean) {
-    mutation.mutate({ friendshipId, isFavorite });
+    favMutation.mutate({ friendshipId, isFavorite });
+  }
+
+  function handleAddFriend() {
+    const trimmed = addDeviceId.trim();
+    if (!trimmed) {
+      setAddError('Device ID를 입력해주세요.');
+      return;
+    }
+    setAddError('');
+    addMutation.mutate(trimmed);
+  }
+
+  function handleToggleAddPanel() {
+    setShowAddPanel((prev) => !prev);
+    setAddDeviceId('');
+    setAddError('');
+    setAddSuccess('');
   }
 
   const friends: Friend[] = data?.success ? data.data : [];
@@ -101,13 +144,52 @@ export default function FriendsPage() {
   return (
     <div className="friends-page">
       <div className="friends-search-bar">
-        <input
-          type="text"
-          className="friends-search-input"
-          placeholder="이름으로 검색"
-          value={searchInput}
-          onChange={handleSearchChange}
-        />
+        <div className="friends-search-row">
+          <input
+            type="text"
+            className="friends-search-input"
+            placeholder="이름으로 검색"
+            value={searchInput}
+            onChange={handleSearchChange}
+          />
+          <button
+            className={`friends-add-btn${showAddPanel ? ' friends-add-btn--active' : ''}`}
+            onClick={handleToggleAddPanel}
+            aria-label="친구 추가"
+          >
+            {showAddPanel ? '✕' : '+'}
+          </button>
+        </div>
+
+        {showAddPanel && (
+          <div className="friends-add-panel">
+            <p className="friends-add-label">상대방 Device ID를 입력하세요</p>
+            <div className="friends-add-row">
+              <input
+                className="friends-add-input"
+                type="text"
+                value={addDeviceId}
+                onChange={(e) => {
+                  setAddDeviceId(e.target.value);
+                  setAddError('');
+                }}
+                placeholder="Device ID"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddFriend();
+                }}
+              />
+              <button
+                className="friends-add-submit-btn"
+                onClick={handleAddFriend}
+                disabled={addMutation.isPending}
+              >
+                {addMutation.isPending ? '추가 중...' : '추가'}
+              </button>
+            </div>
+            {addError && <p className="friends-add-error">{addError}</p>}
+            {addSuccess && <p className="friends-add-success">{addSuccess}</p>}
+          </div>
+        )}
       </div>
 
       {isLoading ? (

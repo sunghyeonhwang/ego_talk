@@ -642,4 +642,110 @@ router.post(
   }
 );
 
+// PATCH /api/chats/:roomId/mute
+// 채팅방 알림 뮤트 상태 변경
+router.patch(
+  "/api/chats/:roomId/mute",
+  async (req: Request, res: Response) => {
+    try {
+      const roomId = req.params.roomId as string;
+      const body = req.body as Record<string, unknown>;
+
+      // roomId 검증
+      if (!isValidUUID(roomId)) {
+        res.status(400).json({
+          success: false,
+          message: "roomId must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // 필수 필드 검증
+      const requiredError = validateRequired(body, ["profile_id"]);
+      if (requiredError) {
+        res.status(400).json({
+          success: false,
+          message: requiredError,
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      const profile_id = String(body.profile_id);
+
+      if (!isValidUUID(profile_id)) {
+        res.status(400).json({
+          success: false,
+          message: "profile_id must be a valid UUID",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      // mute 필드 검증
+      if (body.mute === undefined || body.mute === null) {
+        res.status(400).json({
+          success: false,
+          message: "mute is required",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      if (typeof body.mute !== "boolean") {
+        res.status(400).json({
+          success: false,
+          message: "mute must be a boolean",
+          code: "INVALID_INPUT",
+        });
+        return;
+      }
+
+      const mute = body.mute;
+
+      // 멤버십 검증
+      const isMember = await checkMembership(roomId, profile_id);
+      if (!isMember) {
+        res.status(403).json({
+          success: false,
+          message: "You are not a member of this chat room",
+          code: "NOT_A_MEMBER",
+        });
+        return;
+      }
+
+      // mute 업데이트
+      const result = await pool.query<{
+        room_id: string;
+        mute: boolean;
+      }>(
+        `UPDATE ego_chat_room_members
+         SET mute = $1
+         WHERE room_id = $2 AND user_id = $3
+         RETURNING room_id, mute`,
+        [mute, roomId, profile_id]
+      );
+
+      if (result.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          message: "Room membership not found",
+          code: "NOT_A_MEMBER",
+        });
+        return;
+      }
+
+      res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+      console.error("PATCH /api/chats/:roomId/mute error:", err);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        code: "INTERNAL_ERROR",
+      });
+    }
+  }
+);
+
 export default router;
