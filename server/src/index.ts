@@ -10,6 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 import healthRouter from "./routes/health.js";
 import profilesRouter from "./routes/profiles.js";
 import friendsRouter from "./routes/friends.js";
+import chatsRouter from "./routes/chats.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -23,6 +24,7 @@ app.use(express.json());
 app.use(healthRouter);
 app.use(profilesRouter);
 app.use(friendsRouter);
+app.use(chatsRouter);
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);

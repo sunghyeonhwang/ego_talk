@@ -24,3 +24,22 @@ export async function toggleFavorite(friendId: string, profileId: string, favori
   });
   return res.json();
 }
+
+export async function getChats(profileId: string) {
+  const res = await fetch(`${API_BASE}/chats?profile_id=${profileId}`);
+  return res.json();
+}
+
+export async function createChat(
+  creatorId: string,
+  type: 'dm' | 'group',
+  memberIds: string[],
+  title?: string,
+) {
+  const res = await fetch(`${API_BASE}/chats`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ creator_id: creatorId, type, member_ids: memberIds, title }),
+  });
+  return res.json();
+}

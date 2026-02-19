@@ -59,3 +59,24 @@
 - `POST /api/profiles/bootstrap` → 프로필 생성/조회 정상
 - `GET /api/friends` → 빈 목록 정상 반환
 - 서버/클라이언트 TypeScript 타입 체크 통과
+
+## Phase 3: Chat List (2026-02-20)
+
+### 완료 항목
+
+1. **Backend API**
+   - `GET /api/chats?profile_id=`: 채팅방 목록 (LATERAL JOIN으로 최근 메시지, unread_count, member_count 조회)
+   - `POST /api/chats`: 채팅방 생성 (dm 중복 방지, 트랜잭션 처리)
+
+2. **Frontend 채팅 목록**
+   - ChatsPage: 채팅방 리스트 (아바타, 제목, 마지막 메시지, 시간, 미읽음 배지)
+   - 시간 포맷: 오늘 HH:MM, 어제 "어제", 그 외 MM/DD
+   - 미읽음 배지: 빨간 원 + 숫자 (99+)
+   - 클릭 시 /chats/:roomId 이동 준비
+
+3. **하단 탭 미읽음 배지**
+   - Layout에서 전체 unread 합산 표시
+   - 채팅 탭에 빨간 배지 (0이면 숨김, 100+ → "99+")
+
+### 검증 결과
+- 서버/클라이언트 TypeScript 타입 체크 통과
