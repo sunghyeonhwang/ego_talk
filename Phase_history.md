@@ -131,3 +131,32 @@
 
 ### 검증 결과
 - 서버/클라이언트 TypeScript 타입 체크 통과
+
+## Phase 6: Stabilization & Release (2026-02-20)
+
+### 완료 항목
+
+1. **Backend 운영 기능**
+   - Rate Limiting: 인메모리 (분당 60요청, 429 응답, 자동 정리)
+   - 구조화 로그: requestId + METHOD URL STATUS TIME_ms 출력
+   - 에러 핸들링: catch-all 미들웨어 추가
+   - 배포 준비: Procfile, engines >=18
+
+2. **Frontend 안정화**
+   - ErrorBoundary: 전역 에러 캐치 + "다시 시도" 버튼
+   - API 에러 처리: 공통 apiFetch 래퍼 (res.ok 체크 + throw)
+   - 배포 준비: vercel.json SPA rewrite
+   - 접근성: focus-visible outline, font inherit
+   - 반응형: #root max-width 480px 센터링
+
+### 검증 결과
+- 서버/클라이언트 TypeScript 타입 체크 통과
+- `GET /health` → 정상 응답 + requestId 로그 출력
+- `POST /api/profiles/bootstrap` → 201 + 프로필 생성 확인
+
+### MVP 완료 상태
+- 전체 6 Phase 구현 완료
+- REST API 9개 + Socket.IO 이벤트 3쌍
+- 페이지: 친구 목록, 채팅 목록, 채팅방, 프로필
+- 실시간 메시징, 읽음 처리, 미읽음 배지
+- 프로필 편집, 친구 추가, Rate Limit, 구조화 로그

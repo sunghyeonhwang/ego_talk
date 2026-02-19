@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -12,6 +12,8 @@ import profilesRouter from "./routes/profiles.js";
 import friendsRouter from "./routes/friends.js";
 import chatsRouter from "./routes/chats.js";
 import { setupSocketHandlers } from "./socket.js";
+import { rateLimit } from "./middleware/rateLimit.js";
+import { requestLogger } from "./middleware/requestLogger.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,11 +23,23 @@ const io = new Server(httpServer, {
 });
 
 app.use(cors());
+app.use(requestLogger);
+app.use(rateLimit);
 app.use(express.json());
 app.use(healthRouter);
 app.use(profilesRouter);
 app.use(friendsRouter);
 app.use(chatsRouter);
+
+// Catch-all error handler
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    code: "INTERNAL_ERROR",
+  });
+});
 
 setupSocketHandlers(io);
 

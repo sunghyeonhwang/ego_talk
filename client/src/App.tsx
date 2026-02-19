@@ -6,6 +6,7 @@ import FriendsPage from './pages/FriendsPage';
 import ChatsPage from './pages/ChatsPage';
 import ChatRoomPage from './pages/ChatRoomPage';
 import ProfilePage from './pages/ProfilePage';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useAuthStore } from './store/authStore';
 import { bootstrapProfile } from './api/index';
 
@@ -51,23 +52,25 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppBootstrap>
-          <Routes>
-            {/* Chat room: no tab bar */}
-            <Route path="/chats/:roomId" element={<ChatRoomPage />} />
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AppBootstrap>
+            <Routes>
+              {/* Chat room: no tab bar */}
+              <Route path="/chats/:roomId" element={<ChatRoomPage />} />
 
-            <Route element={<Layout />}>
-              <Route path="/friends" element={<FriendsPage />} />
-              <Route path="/chats" element={<ChatsPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/" element={<Navigate to="/friends" replace />} />
-              <Route path="*" element={<Navigate to="/friends" replace />} />
-            </Route>
-          </Routes>
-        </AppBootstrap>
-      </BrowserRouter>
-    </QueryClientProvider>
+              <Route element={<Layout />}>
+                <Route path="/friends" element={<FriendsPage />} />
+                <Route path="/chats" element={<ChatsPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/" element={<Navigate to="/friends" replace />} />
+                <Route path="*" element={<Navigate to="/friends" replace />} />
+              </Route>
+            </Routes>
+          </AppBootstrap>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

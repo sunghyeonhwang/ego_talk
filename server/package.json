@@ -1,6 +1,9 @@
 {
   "name": "egotalk-server",
   "private": true,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
