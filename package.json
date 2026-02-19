@@ -1,0 +1,12 @@
+{
+  "name": "egotalk",
+  "private": true,
+  "scripts": {
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "install:all": "cd server && npm install && cd ../client && npm install"
+  },
+  "devDependencies": {
+    "pg": "^8.18.0"
+  }
+}
