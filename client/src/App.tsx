@@ -6,9 +6,11 @@ import FriendsPage from './pages/FriendsPage';
 import ChatsPage from './pages/ChatsPage';
 import ChatRoomPage from './pages/ChatRoomPage';
 import ProfilePage from './pages/ProfilePage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAuthStore } from './store/authStore';
-import { bootstrapProfile } from './api/index';
+import { getProfile } from './api/index';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,27 +21,36 @@ const queryClient = new QueryClient({
   },
 });
 
-function AppBootstrap({ children }: { children: React.ReactNode }) {
-  const { profileId, deviceId, setProfile } = useAuthStore();
-  const [bootstrapping, setBootstrapping] = useState(!profileId);
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { token, profileId, setProfile, logout } = useAuthStore();
+  const [loading, setLoading] = useState(!!token && !profileId);
 
   useEffect(() => {
-    if (profileId) return;
+    if (!token || profileId) {
+      setLoading(false);
+      return;
+    }
 
-    const randomSuffix = String(Math.floor(1000 + Math.random() * 9000));
-    const displayName = `사용자${randomSuffix}`;
-
-    bootstrapProfile(deviceId, displayName)
+    // Token exists but profile not loaded — fetch profile
+    getProfile()
       .then((res) => {
         if (res.success && res.data) {
           setProfile(res.data);
+        } else {
+          logout();
         }
       })
-      .catch(console.error)
-      .finally(() => setBootstrapping(false));
-  }, [profileId, deviceId, setProfile]);
+      .catch(() => {
+        logout();
+      })
+      .finally(() => setLoading(false));
+  }, [token, profileId, setProfile, logout]);
 
-  if (bootstrapping) {
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100dvh', fontSize: '14px', color: '#666' }}>
         로딩 중...
@@ -55,20 +66,22 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <AppBootstrap>
-            <Routes>
-              {/* Chat room: no tab bar */}
-              <Route path="/chats/:roomId" element={<ChatRoomPage />} />
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
-              <Route element={<Layout />}>
-                <Route path="/friends" element={<FriendsPage />} />
-                <Route path="/chats" element={<ChatsPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/" element={<Navigate to="/friends" replace />} />
-                <Route path="*" element={<Navigate to="/friends" replace />} />
-              </Route>
-            </Routes>
-          </AppBootstrap>
+            {/* Protected routes */}
+            <Route path="/chats/:roomId" element={<AuthGuard><ChatRoomPage /></AuthGuard>} />
+
+            <Route element={<AuthGuard><Layout /></AuthGuard>}>
+              <Route path="/friends" element={<FriendsPage />} />
+              <Route path="/chats" element={<ChatsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/" element={<Navigate to="/friends" replace />} />
+              <Route path="*" element={<Navigate to="/friends" replace />} />
+            </Route>
+          </Routes>
         </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>

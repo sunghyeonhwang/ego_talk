@@ -252,6 +252,14 @@
   cursor: not-allowed;
 }
 
+/* ===== Typing Indicator ===== */
+.chat-room-typing {
+  padding: 4px 16px 2px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  min-height: 20px;
+}
+
 /* ===== Loading / Error States ===== */
 .chat-room-center-msg {
   flex: 1;

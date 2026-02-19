@@ -7,9 +7,10 @@ import {
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { getMessages, markAsRead, sendMessage } from '../api/index';
+import { getMessages, getRoomInfo, markAsRead, sendMessage } from '../api/index';
 import { useAuthStore } from '../store/authStore';
 import { useSocket } from '../hooks/useSocket';
+import { useTypingIndicator } from '../hooks/useTypingIndicator';
 import './ChatRoomPage.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -21,7 +22,6 @@ interface Message {
   sender_name: string;
   content: string;
   created_at: string;
-  /** Optimistic messages that have not yet been confirmed by the server */
   pending?: boolean;
 }
 
@@ -63,11 +63,7 @@ function isNearBottom(el: HTMLElement, threshold = 80): boolean {
 
 // ─── Sub-Components ───────────────────────────────────────────────────────────
 
-interface DateDividerProps {
-  isoString: string;
-}
-
-function DateDivider({ isoString }: DateDividerProps) {
+function DateDivider({ isoString }: { isoString: string }) {
   return (
     <div className="chat-date-divider" role="separator">
       <span className="chat-date-divider-text">{formatDateLabel(isoString)}</span>
@@ -112,7 +108,6 @@ export default function ChatRoomPage() {
   const profileId = useAuthStore((s) => s.profileId);
   const displayName = useAuthStore((s) => s.displayName);
 
-  // ── State ──────────────────────────────────────────────────────────────────
   const [messages, setMessages] = useState<Message[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -121,19 +116,16 @@ export default function ChatRoomPage() {
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Derived room title from query cache (chats list already loaded it)
   const roomTitle = useRoomTitle(roomId);
+  const { typingText, emitTyping, stopTyping } = useTypingIndicator(socket, roomId, profileId);
 
-  // ── Refs ───────────────────────────────────────────────────────────────────
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  /** Tracks whether we should auto-scroll when new messages arrive */
   const shouldAutoScrollRef = useRef(true);
-  /** Scroll anchor when loading older messages */
   const scrollAnchorRef = useRef<{ id: string; offsetFromBottom: number } | null>(null);
 
-  // ── Load initial messages ──────────────────────────────────────────────────
+  // Load initial messages
   useEffect(() => {
     if (!roomId || !profileId) return;
 
@@ -142,19 +134,17 @@ export default function ChatRoomPage() {
     setNextCursor(null);
     setHasMore(false);
 
-    getMessages(roomId, profileId, undefined, 30)
+    getMessages(roomId, undefined, 30)
       .then((res: MessagesResponse) => {
         if (res.success && res.data) {
           setMessages(res.data.messages);
           setNextCursor(res.data.next_cursor);
           setHasMore(!!res.data.next_cursor);
 
-          // Mark the most recent message as read
           const msgs = res.data.messages;
           if (msgs.length > 0) {
             const latestId = msgs[msgs.length - 1].id;
-            markAsRead(roomId, profileId, latestId).catch(() => {});
-            // Invalidate chats list so unread count refreshes
+            markAsRead(roomId, latestId).catch(() => {});
             queryClient.invalidateQueries({ queryKey: ['chats', profileId] });
           }
         }
@@ -163,14 +153,14 @@ export default function ChatRoomPage() {
       .finally(() => setLoadingInitial(false));
   }, [roomId, profileId, queryClient]);
 
-  // ── Auto-scroll to bottom on initial load ─────────────────────────────────
+  // Auto-scroll on initial load
   useLayoutEffect(() => {
     if (!loadingInitial && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView();
     }
   }, [loadingInitial]);
 
-  // ── Restore scroll position after loading older messages ──────────────────
+  // Restore scroll after loading older messages
   useLayoutEffect(() => {
     const area = messagesAreaRef.current;
     const anchor = scrollAnchorRef.current;
@@ -185,7 +175,7 @@ export default function ChatRoomPage() {
     scrollAnchorRef.current = null;
   });
 
-  // ── Load older messages ────────────────────────────────────────────────────
+  // Load older messages
   const loadMore = useCallback(async () => {
     if (!roomId || !profileId || loadingMore || !hasMore || !nextCursor) return;
 
@@ -203,7 +193,7 @@ export default function ChatRoomPage() {
 
     setLoadingMore(true);
     try {
-      const res: MessagesResponse = await getMessages(roomId, profileId, nextCursor, 30);
+      const res: MessagesResponse = await getMessages(roomId, nextCursor, 30);
       if (res.success && res.data) {
         setMessages((prev) => [...res.data.messages, ...prev]);
         setNextCursor(res.data.next_cursor);
@@ -216,24 +206,23 @@ export default function ChatRoomPage() {
     }
   }, [roomId, profileId, loadingMore, hasMore, nextCursor, messages]);
 
-  // ── Socket: join room & listen for new messages ────────────────────────────
+  // Socket: join room & listen
   useEffect(() => {
     if (!roomId || !profileId || !socket) return;
 
-    // Capture narrowed (non-null) copies for use inside the closure
     const currentRoomId: string = roomId;
     const currentProfileId: string = profileId;
 
-    socket.emit('room:join', { roomId: currentRoomId, profileId: currentProfileId });
+    socket.emit('room:join', { roomId: currentRoomId });
 
-    function onMessageNew(msg: Message) {
-      if (msg.room_id !== currentRoomId) return;
+    function onMessageNew(data: { roomId: string; message: Message }) {
+      const msg = data.message;
+      if (!msg || data.roomId !== currentRoomId) return;
 
       const area = messagesAreaRef.current;
       const wasAtBottom = area ? isNearBottom(area) : true;
 
       setMessages((prev) => {
-        // Replace optimistic message if same content + sender and pending
         const optimisticIdx = prev.findIndex(
           (m) => m.pending && m.sender_id === msg.sender_id && m.content === msg.content,
         );
@@ -242,14 +231,12 @@ export default function ChatRoomPage() {
           updated[optimisticIdx] = msg;
           return updated;
         }
-        // Deduplicate: skip if we already have this id
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
 
-      // Mark as read if message is not mine and we're in the room
       if (msg.sender_id !== currentProfileId) {
-        markAsRead(currentRoomId, currentProfileId, msg.id).catch(() => {});
+        markAsRead(currentRoomId, msg.id).catch(() => {});
         queryClient.invalidateQueries({ queryKey: ['chats', currentProfileId] });
       }
 
@@ -265,7 +252,7 @@ export default function ChatRoomPage() {
     };
   }, [roomId, profileId, socket, queryClient]);
 
-  // ── Auto-scroll when new messages are added ────────────────────────────────
+  // Auto-scroll on new messages
   useLayoutEffect(() => {
     if (!shouldAutoScrollRef.current) return;
     if (messagesEndRef.current) {
@@ -274,22 +261,21 @@ export default function ChatRoomPage() {
     shouldAutoScrollRef.current = false;
   }, [messages]);
 
-  // Track scroll position to decide auto-scroll
   const handleScroll = useCallback(() => {
     const area = messagesAreaRef.current;
     if (!area) return;
     shouldAutoScrollRef.current = isNearBottom(area);
   }, []);
 
-  // ── Send message ───────────────────────────────────────────────────────────
+  // Send message
   const handleSend = useCallback(async () => {
     const content = inputValue.trim();
     if (!content || !roomId || !profileId || sending) return;
 
     setInputValue('');
     setSending(true);
+    stopTyping();
 
-    // Optimistic update
     const optimisticMsg: Message = {
       id: `optimistic-${Date.now()}`,
       room_id: roomId,
@@ -303,25 +289,23 @@ export default function ChatRoomPage() {
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
-      await sendMessage(roomId, profileId, content);
-      // Server will emit socket event "message:new" which replaces the optimistic entry
+      await sendMessage(roomId, content);
       queryClient.invalidateQueries({ queryKey: ['chats', profileId] });
     } catch (err) {
       console.error(err);
-      // Remove failed optimistic message
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
     } finally {
       setSending(false);
     }
-  }, [inputValue, roomId, profileId, sending, displayName, queryClient]);
+  }, [inputValue, roomId, profileId, sending, displayName, queryClient, stopTyping]);
 
-  // Textarea auto-resize
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
     setInputValue(ta.value);
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
-  }, []);
+    emitTyping();
+  }, [emitTyping]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -333,13 +317,10 @@ export default function ChatRoomPage() {
     [handleSend],
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   const canSend = inputValue.trim().length > 0 && !sending;
 
   return (
     <div className="chat-room-page">
-      {/* Header */}
       <header className="chat-room-header">
         <button
           className="chat-room-back-btn"
@@ -351,7 +332,6 @@ export default function ChatRoomPage() {
         <h1 className="chat-room-title">{roomTitle || '채팅방'}</h1>
       </header>
 
-      {/* Messages */}
       {loadingInitial ? (
         <div className="chat-room-center-msg">로딩 중...</div>
       ) : (
@@ -378,7 +358,10 @@ export default function ChatRoomPage() {
         </div>
       )}
 
-      {/* Input Area */}
+      <div className="chat-room-typing" aria-live="polite">
+        {typingText}
+      </div>
+
       <div className="chat-room-input-area">
         <textarea
           ref={textareaRef}
@@ -416,7 +399,6 @@ function renderMessagesWithDividers(messages: Message[], myProfileId: string) {
     }
 
     const isMine = msg.sender_id === myProfileId;
-    // Show sender name for theirs messages only if the previous message was from someone else
     const prevMsg = idx > 0 ? messages[idx - 1] : null;
     const showSenderName =
       !isMine && (prevMsg === null || prevMsg.sender_id !== msg.sender_id);
@@ -427,7 +409,6 @@ function renderMessagesWithDividers(messages: Message[], myProfileId: string) {
         msg={msg}
         isMine={isMine}
         showSenderName={showSenderName}
-        data-msg-id={msg.id}
       />,
     );
   });
@@ -435,7 +416,7 @@ function renderMessagesWithDividers(messages: Message[], myProfileId: string) {
   return elements;
 }
 
-// ─── Helper hook: get room title from query cache ──────────────────────────────
+// ─── Helper hook: get room title from query cache or fetch from API ────────────
 
 interface CachedChatRoom {
   room_id: string;
@@ -445,15 +426,31 @@ interface CachedChatRoom {
 function useRoomTitle(roomId: string | undefined): string {
   const queryClient = useQueryClient();
   const profileId = useAuthStore((s) => s.profileId);
+  const [fetchedTitle, setFetchedTitle] = useState<string>('');
 
-  if (!roomId) return '';
-
+  // Try to get title from chats cache first
   const data = queryClient.getQueryData<{ success: boolean; data: CachedChatRoom[] }>([
     'chats',
     profileId,
   ]);
-  if (!data?.success || !data.data) return '';
+  const cachedRoom = data?.success && data.data
+    ? data.data.find((r) => r.room_id === roomId)
+    : null;
+  const cachedTitle = cachedRoom?.title ?? null;
 
-  const room = data.data.find((r) => r.room_id === roomId);
-  return room?.title ?? '';
+  // If not in cache, fetch from /api/chats/:roomId/info
+  useEffect(() => {
+    if (!roomId || cachedTitle) return;
+
+    getRoomInfo(roomId)
+      .then((res: { success: boolean; data: { title: string } }) => {
+        if (res.success && res.data?.title) {
+          setFetchedTitle(res.data.title);
+        }
+      })
+      .catch(() => {});
+  }, [roomId, cachedTitle]);
+
+  if (!roomId) return '';
+  return cachedTitle || fetchedTitle;
 }

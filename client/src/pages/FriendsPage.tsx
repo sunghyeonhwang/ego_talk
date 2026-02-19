@@ -1,16 +1,17 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFriends, toggleFavorite, addFriend } from '../api/index';
+import { useNavigate } from 'react-router-dom';
+import { getFriends, toggleFavorite, addFriend, createChat } from '../api/index';
 import { useAuthStore } from '../store/authStore';
 import './FriendsPage.css';
 
 interface Friend {
   friendship_id: string;
-  profile_id: string;
+  friend_id: string;
   display_name: string;
   status_message: string;
   avatar_url: string;
-  is_favorite: boolean;
+  favorite: boolean;
 }
 
 interface FriendsResponse {
@@ -24,12 +25,13 @@ function getInitials(name: string): string {
 
 interface FriendItemProps {
   friend: Friend;
-  onToggleFavorite: (friendshipId: string, isFavorite: boolean) => void;
+  onToggleFavorite: (friendId: string, isFavorite: boolean) => void;
+  onClickFriend: (friendId: string) => void;
 }
 
-function FriendItem({ friend, onToggleFavorite }: FriendItemProps) {
+function FriendItem({ friend, onToggleFavorite, onClickFriend }: FriendItemProps) {
   return (
-    <li className="friend-item">
+    <li className="friend-item" onClick={() => onClickFriend(friend.friend_id)}>
       <div className="friend-avatar">
         {friend.avatar_url ? (
           <img src={friend.avatar_url} alt={friend.display_name} className="friend-avatar-img" />
@@ -44,11 +46,11 @@ function FriendItem({ friend, onToggleFavorite }: FriendItemProps) {
         )}
       </div>
       <button
-        className={`friend-fav-btn${friend.is_favorite ? ' friend-fav-btn--active' : ''}`}
-        onClick={() => onToggleFavorite(friend.friendship_id, friend.is_favorite)}
-        aria-label={friend.is_favorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+        className={`friend-fav-btn${friend.favorite ? ' friend-fav-btn--active' : ''}`}
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(friend.friend_id, friend.favorite); }}
+        aria-label={friend.favorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
       >
-        {friend.is_favorite ? '★' : '☆'}
+        {friend.favorite ? '★' : '☆'}
       </button>
     </li>
   );
@@ -57,13 +59,14 @@ function FriendItem({ friend, onToggleFavorite }: FriendItemProps) {
 export default function FriendsPage() {
   const profileId = useAuthStore((s) => s.profileId);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [searchInput, setSearchInput] = useState('');
   const [query, setQuery] = useState('');
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showAddPanel, setShowAddPanel] = useState(false);
-  const [addDeviceId, setAddDeviceId] = useState('');
+  const [addEmail, setAddEmail] = useState('');
   const [addError, setAddError] = useState('');
   const [addSuccess, setAddSuccess] = useState('');
 
@@ -78,29 +81,24 @@ export default function FriendsPage() {
 
   const { data, isLoading } = useQuery<FriendsResponse>({
     queryKey: ['friends', profileId, query],
-    queryFn: () => getFriends(profileId!, query || undefined),
+    queryFn: () => getFriends(query || undefined),
     enabled: !!profileId,
   });
 
   const favMutation = useMutation({
-    mutationFn: ({
-      friendshipId,
-      isFavorite,
-    }: {
-      friendshipId: string;
-      isFavorite: boolean;
-    }) => toggleFavorite(friendshipId, profileId!, !isFavorite),
+    mutationFn: ({ friendId, isFavorite }: { friendId: string; isFavorite: boolean }) =>
+      toggleFavorite(friendId, !isFavorite),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['friends', profileId] });
     },
   });
 
   const addMutation = useMutation({
-    mutationFn: (friendDeviceId: string) => addFriend(profileId!, friendDeviceId),
+    mutationFn: (friendEmail: string) => addFriend(friendEmail),
     onSuccess: (res) => {
       if (res.success) {
         setAddSuccess('친구가 추가되었습니다.');
-        setAddDeviceId('');
+        setAddEmail('');
         setAddError('');
         queryClient.invalidateQueries({ queryKey: ['friends', profileId] });
         setTimeout(() => {
@@ -116,30 +114,42 @@ export default function FriendsPage() {
     },
   });
 
-  function handleToggleFavorite(friendshipId: string, isFavorite: boolean) {
-    favMutation.mutate({ friendshipId, isFavorite });
+  function handleToggleFavorite(friendId: string, isFavorite: boolean) {
+    favMutation.mutate({ friendId, isFavorite });
   }
 
   function handleAddFriend() {
-    const trimmed = addDeviceId.trim();
+    const trimmed = addEmail.trim();
     if (!trimmed) {
-      setAddError('Device ID를 입력해주세요.');
+      setAddError('이메일을 입력해주세요.');
       return;
     }
     setAddError('');
     addMutation.mutate(trimmed);
   }
 
+  async function handleClickFriend(friendId: string) {
+    if (!profileId) return;
+    try {
+      const res = await createChat('dm', [friendId]);
+      if (res.success && res.data) {
+        navigate(`/chats/${res.data.room_id}`);
+      }
+    } catch (err) {
+      console.error('Failed to create/open DM:', err);
+    }
+  }
+
   function handleToggleAddPanel() {
     setShowAddPanel((prev) => !prev);
-    setAddDeviceId('');
+    setAddEmail('');
     setAddError('');
     setAddSuccess('');
   }
 
   const friends: Friend[] = data?.success ? data.data : [];
-  const favorites = friends.filter((f) => f.is_favorite);
-  const others = friends.filter((f) => !f.is_favorite);
+  const favorites = friends.filter((f) => f.favorite);
+  const others = friends.filter((f) => !f.favorite);
 
   return (
     <div className="friends-page">
@@ -163,17 +173,17 @@ export default function FriendsPage() {
 
         {showAddPanel && (
           <div className="friends-add-panel">
-            <p className="friends-add-label">상대방 Device ID를 입력하세요</p>
+            <p className="friends-add-label">상대방 이메일을 입력하세요</p>
             <div className="friends-add-row">
               <input
                 className="friends-add-input"
-                type="text"
-                value={addDeviceId}
+                type="email"
+                value={addEmail}
                 onChange={(e) => {
-                  setAddDeviceId(e.target.value);
+                  setAddEmail(e.target.value);
                   setAddError('');
                 }}
-                placeholder="Device ID"
+                placeholder="이메일 주소"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAddFriend();
                 }}
@@ -207,6 +217,7 @@ export default function FriendsPage() {
                     key={friend.friendship_id}
                     friend={friend}
                     onToggleFavorite={handleToggleFavorite}
+                    onClickFriend={handleClickFriend}
                   />
                 ))}
               </ul>
@@ -221,6 +232,7 @@ export default function FriendsPage() {
                     key={friend.friendship_id}
                     friend={friend}
                     onToggleFavorite={handleToggleFavorite}
+                    onClickFriend={handleClickFriend}
                   />
                 ))}
               </ul>

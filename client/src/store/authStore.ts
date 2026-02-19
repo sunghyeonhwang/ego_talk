@@ -1,42 +1,73 @@
 import { create } from 'zustand';
 
 interface AuthState {
+  token: string | null;
   profileId: string | null;
-  deviceId: string;
+  email: string;
   displayName: string;
   statusMessage: string;
   avatarUrl: string;
+  setAuth: (data: {
+    token: string;
+    profile: {
+      id: string;
+      email: string;
+      display_name: string;
+      status_message: string;
+      avatar_url: string;
+    };
+  }) => void;
   setProfile: (profile: {
     id: string;
-    device_id: string;
+    email?: string;
     display_name: string;
     status_message: string;
     avatar_url: string;
   }) => void;
+  logout: () => void;
 }
 
-const DEVICE_ID_KEY = 'egotalk_device_id';
+const TOKEN_KEY = 'egotalk_token';
 
-function getOrCreateDeviceId(): string {
-  const stored = localStorage.getItem(DEVICE_ID_KEY);
-  if (stored) return stored;
-  const newId = crypto.randomUUID();
-  localStorage.setItem(DEVICE_ID_KEY, newId);
-  return newId;
+function getStoredToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
+  token: getStoredToken(),
   profileId: null,
-  deviceId: getOrCreateDeviceId(),
+  email: '',
   displayName: '',
   statusMessage: '',
   avatarUrl: '',
+  setAuth: (data) => {
+    localStorage.setItem(TOKEN_KEY, data.token);
+    set({
+      token: data.token,
+      profileId: data.profile.id,
+      email: data.profile.email,
+      displayName: data.profile.display_name,
+      statusMessage: data.profile.status_message || '',
+      avatarUrl: data.profile.avatar_url || '',
+    });
+  },
   setProfile: (profile) =>
     set({
       profileId: profile.id,
-      deviceId: profile.device_id,
+      email: profile.email || '',
       displayName: profile.display_name,
-      statusMessage: profile.status_message,
-      avatarUrl: profile.avatar_url,
+      statusMessage: profile.status_message || '',
+      avatarUrl: profile.avatar_url || '',
     }),
+  logout: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    set({
+      token: null,
+      profileId: null,
+      email: '',
+      displayName: '',
+      statusMessage: '',
+      avatarUrl: '',
+    });
+  },
 }));

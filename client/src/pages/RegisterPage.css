@@ -1,0 +1,91 @@
+.register-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 20px;
+  background: var(--color-bg);
+}
+
+.register-card {
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.register-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.register-subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin-bottom: 32px;
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.register-input {
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.register-input:focus {
+  border-color: var(--color-primary);
+}
+
+.register-error {
+  color: var(--color-danger);
+  font-size: 13px;
+  text-align: left;
+  margin: 0;
+}
+
+.register-btn {
+  padding: 12px;
+  background: var(--color-primary);
+  color: var(--color-text);
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.register-btn:hover {
+  opacity: 0.9;
+}
+
+.register-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.register-login-link {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.register-login-link a {
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.register-login-link a:hover {
+  text-decoration: underline;
+}

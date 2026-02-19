@@ -227,3 +227,91 @@
   color: var(--color-text-secondary);
   line-height: 1.4;
 }
+
+.profile-email {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.profile-logout-btn {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  color: var(--color-danger);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.profile-logout-btn:hover {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+/* ── Notification Section ── */
+.profile-notification-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-notification-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.profile-notification-status {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.profile-notification-status--unsupported,
+.profile-notification-status--denied {
+  color: var(--color-danger);
+}
+
+.profile-notification-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-notification-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.profile-notification-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.profile-notification-btn--on {
+  background: var(--color-primary);
+  color: var(--color-text);
+  border-color: var(--color-primary);
+}
+
+.profile-notification-btn--on:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.profile-notification-btn:not(.profile-notification-btn--on):hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+}

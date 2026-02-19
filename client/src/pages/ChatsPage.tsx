@@ -8,9 +8,11 @@ interface ChatRoom {
   room_id: string;
   title: string | null;
   type: 'dm' | 'group';
-  last_message_content: string | null;
-  last_message_sender_name: string | null;
-  last_message_at: string | null;
+  last_message: {
+    content: string;
+    sender_name: string | null;
+    created_at: string;
+  } | null;
   unread_count: number;
 }
 
@@ -59,11 +61,11 @@ interface ChatItemProps {
 
 function ChatItem({ room, onClick }: ChatItemProps) {
   const roomTitle = room.title || '채팅방';
-  const hasLastMessage = !!room.last_message_content;
+  const hasLastMessage = !!room.last_message;
   const lastMessagePreview = hasLastMessage
-    ? room.last_message_sender_name
-      ? `${room.last_message_sender_name}: ${room.last_message_content}`
-      : (room.last_message_content ?? '')
+    ? room.last_message!.sender_name
+      ? `${room.last_message!.sender_name}: ${room.last_message!.content}`
+      : room.last_message!.content
     : '';
 
   return (
@@ -79,8 +81,8 @@ function ChatItem({ room, onClick }: ChatItemProps) {
         )}
       </div>
       <div className="chat-meta">
-        {room.last_message_at && (
-          <span className="chat-time">{formatTime(room.last_message_at)}</span>
+        {room.last_message?.created_at && (
+          <span className="chat-time">{formatTime(room.last_message.created_at)}</span>
         )}
         {room.unread_count > 0 && (
           <span className="chat-unread-badge">{formatUnread(room.unread_count)}</span>
@@ -96,7 +98,7 @@ export default function ChatsPage() {
 
   const { data, isLoading } = useQuery<ChatsResponse>({
     queryKey: ['chats', profileId],
-    queryFn: () => getChats(profileId!),
+    queryFn: () => getChats(),
     enabled: !!profileId,
   });
 

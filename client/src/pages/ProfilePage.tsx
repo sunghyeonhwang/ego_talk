@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { updateProfile } from '../api/index';
+import { disconnectSocket } from '../hooks/useSocket';
+import AvatarUpload from '../components/AvatarUpload';
+import { usePushNotification } from '../hooks/usePushNotification';
 import './ProfilePage.css';
 
 function getInitials(name: string): string {
@@ -9,18 +13,20 @@ function getInitials(name: string): string {
 }
 
 export default function ProfilePage() {
-  const { profileId, deviceId, displayName, statusMessage, avatarUrl, setProfile } = useAuthStore();
+  const navigate = useNavigate();
+  const { email, displayName, statusMessage, avatarUrl, setProfile, logout } = useAuthStore();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(displayName);
   const [editStatus, setEditStatus] = useState(statusMessage);
   const [editAvatarUrl, setEditAvatarUrl] = useState(avatarUrl);
   const [errorMsg, setErrorMsg] = useState('');
-  const [copySuccess, setCopySuccess] = useState(false);
+
+  const { permission, isSubscribed, isLoading: pushLoading, isSupported, subscribe, unsubscribe } = usePushNotification();
 
   const mutation = useMutation({
     mutationFn: (data: { display_name?: string; status_message?: string; avatar_url?: string }) =>
-      updateProfile(profileId!, data),
+      updateProfile(data),
     onSuccess: (res) => {
       if (res.success && res.data) {
         setProfile(res.data);
@@ -61,14 +67,10 @@ export default function ProfilePage() {
     });
   }
 
-  async function handleCopyDeviceId() {
-    try {
-      await navigator.clipboard.writeText(deviceId);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch {
-      // clipboard API not available
-    }
+  function handleLogout() {
+    disconnectSocket();
+    logout();
+    navigate('/login', { replace: true });
   }
 
   return (
@@ -76,17 +78,24 @@ export default function ProfilePage() {
       <h2 className="profile-title">내 프로필</h2>
 
       <div className="profile-card">
-        <div className="profile-avatar">
-          {(isEditing ? editAvatarUrl : avatarUrl) ? (
-            <img
-              src={isEditing ? editAvatarUrl : avatarUrl}
-              alt={displayName}
-              className="profile-avatar-img"
-            />
-          ) : (
-            <span className="profile-avatar-initials">{getInitials(displayName)}</span>
-          )}
-        </div>
+        {isEditing ? (
+          <AvatarUpload
+            currentAvatarUrl={editAvatarUrl}
+            displayName={editName || displayName}
+            onUploaded={(newUrl, profileData) => {
+              setEditAvatarUrl(newUrl);
+              if (profileData) setProfile(profileData);
+            }}
+          />
+        ) : (
+          <div className="profile-avatar">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={displayName} className="profile-avatar-img" />
+            ) : (
+              <span className="profile-avatar-initials">{getInitials(displayName)}</span>
+            )}
+          </div>
+        )}
 
         {isEditing ? (
           <div className="profile-edit-form">
@@ -112,16 +121,6 @@ export default function ProfilePage() {
                 maxLength={100}
               />
             </div>
-            <div className="profile-edit-field">
-              <label className="profile-edit-label">아바타 URL</label>
-              <input
-                className="profile-edit-input"
-                type="url"
-                value={editAvatarUrl}
-                onChange={(e) => setEditAvatarUrl(e.target.value)}
-                placeholder="이미지 URL을 입력하세요"
-              />
-            </div>
             {errorMsg && <p className="profile-edit-error">{errorMsg}</p>}
             <div className="profile-edit-actions">
               <button
@@ -143,6 +142,7 @@ export default function ProfilePage() {
         ) : (
           <div className="profile-info">
             <p className="profile-name">{displayName || '이름 없음'}</p>
+            {email && <p className="profile-email">{email}</p>}
             <p className="profile-status">{statusMessage || '상태 메시지를 입력해보세요.'}</p>
             <button className="profile-btn profile-btn--edit" onClick={handleEditClick}>
               편집
@@ -152,18 +152,37 @@ export default function ProfilePage() {
       </div>
 
       <div className="profile-settings-card">
-        <p className="profile-settings-label">내 Device ID</p>
-        <div className="profile-device-row">
-          <span className="profile-device-id">{deviceId}</span>
-          <button
-            className="profile-copy-btn"
-            onClick={handleCopyDeviceId}
-            aria-label="Device ID 복사"
-          >
-            {copySuccess ? '복사됨' : '복사'}
-          </button>
+        <button className="profile-logout-btn" onClick={handleLogout}>
+          로그아웃
+        </button>
+      </div>
+
+      <div className="profile-settings-card">
+        <div className="profile-notification-section">
+          <p className="profile-notification-label">푸시 알림</p>
+          {!isSupported ? (
+            <p className="profile-notification-status profile-notification-status--unsupported">
+              이 브라우저는 푸시 알림을 지원하지 않습니다.
+            </p>
+          ) : permission === 'denied' ? (
+            <p className="profile-notification-status profile-notification-status--denied">
+              알림 권한이 차단되었습니다. 브라우저 설정에서 허용해주세요.
+            </p>
+          ) : (
+            <div className="profile-notification-toggle">
+              <p className="profile-notification-status">
+                {isSubscribed ? '알림 켜짐' : '알림 꺼짐'}
+              </p>
+              <button
+                className={`profile-notification-btn${isSubscribed ? ' profile-notification-btn--on' : ''}`}
+                onClick={isSubscribed ? unsubscribe : subscribe}
+                disabled={pushLoading}
+              >
+                {pushLoading ? '처리 중...' : isSubscribed ? '알림 끄기' : '알림 켜기'}
+              </button>
+            </div>
+          )}
         </div>
-        <p className="profile-settings-hint">이 ID를 친구에게 알려주면 친구 추가가 가능합니다.</p>
       </div>
     </div>
   );
