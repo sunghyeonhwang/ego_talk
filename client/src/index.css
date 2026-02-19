@@ -1,0 +1,18 @@
+:root {
+  --color-primary: #FEE500;
+  --color-text: #111111;
+  --color-text-secondary: #666666;
+  --color-border: #E5E7EB;
+  --color-danger: #DC2626;
+  --color-bg: #FFFFFF;
+  --color-bg-secondary: #F9FAFB;
+  --font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-family);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}

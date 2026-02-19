@@ -1,0 +1,17 @@
+.chats-page {
+  padding: 20px 16px;
+}
+
+.chats-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
+
+.chats-empty {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  margin-top: 60px;
+}

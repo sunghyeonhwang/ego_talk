@@ -1,0 +1,140 @@
+.friends-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.friends-search-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-bg);
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.friends-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  font-size: 14px;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.friends-search-input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.friends-search-input:focus {
+  border-color: #999;
+}
+
+.friends-loading,
+.friends-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.friends-section {
+  padding: 0;
+}
+
+.friends-section-title {
+  padding: 10px 16px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.friends-list {
+  list-style: none;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 16px;
+  gap: 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.friend-item:hover {
+  background: var(--color-bg-secondary);
+}
+
+.friend-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.friend-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.friend-avatar-initials {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.friend-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.friend-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-status {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-fav-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.15s, transform 0.1s;
+}
+
+.friend-fav-btn:hover {
+  transform: scale(1.2);
+}
+
+.friend-fav-btn--active {
+  color: #F59E0B;
+}
