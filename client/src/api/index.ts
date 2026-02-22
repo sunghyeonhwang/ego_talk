@@ -1,6 +1,6 @@
 import { useAuthStore } from '../store/authStore';
 
-const API_BASE = '/api';
+const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api';
 
 function getToken(): string | null {
   return useAuthStore.getState().token;
@@ -154,7 +154,8 @@ export async function uploadAvatar(file: File) {
   const formData = new FormData();
   formData.append('avatar', file);
 
-  const res = await fetch(`${API_BASE}/upload/avatar`, {
+  const uploadBase = (import.meta.env.VITE_API_URL || '') + '/api';
+  const res = await fetch(`${uploadBase}/upload/avatar`, {
     method: 'POST',
     headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     body: formData,

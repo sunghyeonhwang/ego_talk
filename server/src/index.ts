@@ -23,11 +23,13 @@ import { authMiddleware } from "./middleware/auth.js";
 const app = express();
 const httpServer = createServer(app);
 
+const CLIENT_URL = process.env.CLIENT_URL || "*";
+
 const io = new Server(httpServer, {
-  cors: { origin: "*" },
+  cors: { origin: CLIENT_URL },
 });
 
-app.use(cors());
+app.use(cors({ origin: CLIENT_URL }));
 app.use(requestLogger);
 app.use(rateLimit);
 app.use(express.json());

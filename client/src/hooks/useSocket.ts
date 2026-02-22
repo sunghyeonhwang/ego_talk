@@ -6,7 +6,8 @@ let socketInstance: Socket | null = null;
 
 export function getSocket(token: string): Socket {
   if (!socketInstance) {
-    socketInstance = io({
+    const serverUrl = import.meta.env.VITE_API_URL || undefined;
+    socketInstance = io(serverUrl, {
       transports: ['websocket', 'polling'],
       auth: { token },
     });

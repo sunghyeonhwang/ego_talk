@@ -70,7 +70,11 @@ export default function ProfilePage() {
   function handleLogout() {
     disconnectSocket();
     logout();
-    navigate('/login', { replace: true });
+    try {
+      navigate('/login', { replace: true });
+    } catch {
+      window.location.href = '/login';
+    }
   }
 
   return (
