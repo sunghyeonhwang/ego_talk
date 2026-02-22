@@ -160,3 +160,122 @@
 - 페이지: 친구 목록, 채팅 목록, 채팅방, 프로필
 - 실시간 메시징, 읽음 처리, 미읽음 배지
 - 프로필 편집, 친구 추가, Rate Limit, 구조화 로그
+
+---
+
+## Phase 7: Auth - Email/PW + JWT (2026-02-20)
+
+### 완료 항목
+
+1. **DB 변경**
+   - `ego_profiles`에 `email TEXT UNIQUE`, `password_hash TEXT` 컬럼 추가
+   - `device_id` NOT NULL 제약 해제
+
+2. **Backend 인증 시스템**
+   - `server/src/middleware/auth.ts`: JWT 검증 미들웨어, `signToken()` 헬퍼, `req.profileId` 타입 확장
+   - `server/src/routes/auth.ts`: `POST /api/auth/register` (bcrypt 해싱), `POST /api/auth/login`
+   - 모든 라우트에서 `body/query의 profile_id` → `req.profileId` (JWT 기반)으로 전환
+   - Socket.IO 인증 미들웨어: `socket.handshake.auth.token` → `socket.data.profileId`
+
+3. **Backend 라우트 리팩토링**
+   - `profiles.ts`: bootstrap 제거 → `GET /api/profiles/me`, `PATCH /api/profiles/me`
+   - `friends.ts`: device_id 기반 → email 기반 친구 추가 (`friend_email`)
+   - `chats.ts`: 모든 엔드포인트 `req.profileId` 사용
+
+4. **Frontend 인증 체계**
+   - `authStore.ts`: deviceId 제거, `token/email` 추가, `setAuth()/logout()` 액션
+   - `api/index.ts`: Authorization 헤더 자동 추가, 401 시 자동 로그아웃
+   - `LoginPage.tsx/.css`, `RegisterPage.tsx/.css`: 로그인/회원가입 페이지
+   - `App.tsx`: AppBootstrap → AuthGuard 교체, `/login` `/register` 라우트 추가
+   - `useSocket.ts`: `auth.token` 전달, `disconnectSocket()` 추가
+   - 모든 페이지에서 profileId 파라미터 제거
+
+### 검증 결과
+- 회원가입 → 자동 로그인 → /friends 이동 확인
+- 토큰 없이 API → 401 정상
+- 서버/클라이언트 TypeScript 타입 체크 통과
+
+## Phase 8: Chat Room Title + Typing Indicator (2026-02-20)
+
+### 완료 항목
+
+1. **Backend**
+   - `chats.ts`: GET /api/chats 쿼리에 `member_names` 서브쿼리 추가 (본인 제외)
+   - title이 null이면 member_names 사용: `title || member_names || '채팅방'`
+   - `GET /api/chats/:roomId/info` 엔드포인트 추가
+   - `socket.ts`: `typing:start`/`typing:stop` 릴레이 이벤트 추가
+   - 소켓 연결 시 `socket.data.displayName` 캐싱
+
+2. **Frontend**
+   - `useTypingIndicator.ts`: 1초 throttle emitTyping, 5초 타임아웃 자동 제거
+   - `ChatRoomPage.tsx`: typing indicator UI, 입력 시 emitTyping() 호출
+   - `ChatRoomPage.css`: typing indicator 스타일
+
+### 검증 결과
+- 서버/클라이언트 TypeScript 타입 체크 통과
+
+## Phase 9: Profile Image Upload - Supabase Storage (2026-02-20)
+
+### 완료 항목
+
+1. **Backend**
+   - `server/src/routes/upload.ts`: `POST /api/upload/avatar` (multer + Supabase Storage)
+   - 5MB 제한, JPEG/PNG/WebP/GIF만 허용
+   - `avatars/{profileId}/{timestamp}.{ext}` 경로로 업로드
+   - `ego_profiles.avatar_url` 자동 업데이트
+
+2. **Frontend**
+   - `AvatarUpload.tsx/.css`: 파일 선택, 미리보기, 업로드 컴포넌트
+   - `ProfilePage.tsx`: 편집 모드에서 AvatarUpload 사용
+   - `api/index.ts`: `uploadAvatar(file)` 함수 (FormData)
+
+### 검증 결과
+- 서버/클라이언트 TypeScript 타입 체크 통과
+- 주의: SUPABASE_SERVICE_ROLE_KEY 실제 값 설정 필요, "avatars" 버킷 생성 필요
+
+## Phase 10: Web Push Notifications (2026-02-20)
+
+### 완료 항목
+
+1. **DB 변경**
+   - `ego_push_subscriptions` 테이블 생성 (endpoint, p256dh, auth 키 저장)
+   - `idx_ego_push_subscriptions_user_id` 인덱스 추가
+
+2. **Backend**
+   - `server/src/routes/push.ts`: `POST /api/push/subscribe`, `DELETE /api/push/unsubscribe`
+   - `server/src/utils/pushNotification.ts`: `sendPushToRoom()` (mute 제외, 만료 구독 자동 삭제)
+   - `socket.ts`: message:send 후 `sendPushToRoom()` 호출
+
+3. **Frontend**
+   - `client/public/sw.js`: Service Worker (push → showNotification, 클릭 → 채팅방 이동)
+   - `usePushNotification.ts`: subscribe/unsubscribe, 권한 상태 관리
+   - `ProfilePage.tsx`: 알림 설정 섹션 (켜기/끄기 토글)
+
+### 검증 결과
+- 서버/클라이언트 TypeScript 타입 체크 통과
+- 주의: VAPID 키 환경변수 설정 필요
+
+## Phase 11: UI/UX - 하단 탭 네비게이션 (2026-02-20)
+
+### 완료 항목
+
+1. **Frontend**
+   - `Layout.tsx`: 이모지 아이콘 → 인라인 SVG 컴포넌트 (FriendsIcon, ChatsIcon, ProfileIcon)
+   - `Layout.css`: 활성 탭 스타일 강화
+     - 활성: `#1a1a1a` 색상, `font-weight: 600`, 3px indicator bar (`::after`)
+     - 비활성: `#999`, 0.2s transition
+     - 탭 아이콘 크기 20px, 라벨 10px
+
+### 검증 결과
+- 서버/클라이언트 TypeScript 타입 체크 통과
+
+---
+
+### 2차 개발 완료 상태 (Phase 7-11)
+- JWT 인증 체계 전환 완료 (email + password + Bearer token)
+- REST API 추가: auth/register, auth/login, profiles/me, chats/:roomId/info, upload/avatar, push/subscribe, push/unsubscribe
+- Socket.IO 이벤트 추가: typing:start/stop 릴레이, 소켓 JWT 인증
+- 페이지 추가: LoginPage, RegisterPage
+- 컴포넌트 추가: AvatarUpload, TypingIndicator (inline)
+- 훅 추가: useTypingIndicator, usePushNotification
+- UI 개선: SVG 탭 아이콘, 활성 탭 indicator bar

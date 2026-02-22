@@ -48,7 +48,7 @@ export default function RegisterPage() {
   return (
     <div className="register-page">
       <div className="register-card">
-        <h1 className="register-title">EgoTalk</h1>
+        <img src="/ego_logo.svg" alt="EgoTalk" className="register-logo" />
         <p className="register-subtitle">회원가입</p>
 
         <form className="register-form" onSubmit={handleSubmit}>

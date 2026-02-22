@@ -13,6 +13,12 @@
   text-align: center;
 }
 
+.register-logo {
+  width: 100px;
+  height: 100px;
+  margin-bottom: 8px;
+}
+
 .register-title {
   font-size: 28px;
   font-weight: 700;

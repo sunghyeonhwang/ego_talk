@@ -42,7 +42,7 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1 className="login-title">EgoTalk</h1>
+        <img src="/ego_logo.svg" alt="EgoTalk" className="login-logo" />
         <p className="login-subtitle">로그인</p>
 
         <form className="login-form" onSubmit={handleSubmit}>
